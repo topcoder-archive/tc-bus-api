@@ -6,7 +6,8 @@ const _ = require('lodash')
 const Joi = require('joi')
 const getParams = require('get-parameter-names')
 const config = require('config')
-const jwt = require('jsonwebtoken')
+const auth = require('tc-core-library-js').auth
+const validator = auth.createValidator(config)
 const createError = require('http-errors')
 
 const logger = require('./logger')
@@ -90,30 +91,17 @@ function buildService (service) {
   decorateWithLogging(service)
 }
 
-/**
- * Verify the JWT token and get the payload.
- *
- * @param {String} token the JWT token to verify
- * @returns {Object} the payload decoded from the token
+/** Verify a token through the shared provider; retained for helper API compatibility.
+ * @param {String} token Raw JWT to validate.
+ * @returns {Promise<Object>} Normalized service/member principal.
+ * @throws {Error} Sanitized unauthorized error on verification failure.
  */
-function verifyJwtToken (token) {
-  let payload
-
+async function verifyJwtToken (token) {
   try {
-    payload = jwt.verify(token, config.JWT_TOKEN_SECRET)
-  } catch (err) {
-    if (err.message === 'jwt expired') {
-      throw createError.Unauthorized('Token has been expired')
-    }
-
-    throw createError.Unauthorized('Failed to verify token')
+    return await validator.verify(token)
+  } catch (error) {
+    throw createError.Unauthorized('Invalid or expired token')
   }
-
-  if (!payload) {
-    throw createError.Unauthorized('Failed to decode token')
-  }
-
-  return payload
 }
 
 /**
@@ -144,11 +132,16 @@ function validateEventPayload (event) {
   }
 }
 
+/** Require an exact service grant for Bus publication/topic operations.
+ * @param {Object} req Swagger request containing the normalized authUser.
+ * @param {String} scope Required operation scope.
+ * @returns {void} Returns when authorized.
+ * @throws {Error} 403 for members, missing identity or insufficient grants.
+ */
 function verifyTokenScope (req, scope) {
-  const isMachineToken = _.get(req.swagger.params, 'authUser.isMachine', false)
-  const scopes = _.get(req.swagger.params, 'authUser.scopes', [])
-  if (isMachineToken && !(_.indexOf(scopes, scope) >= 0)) {
-    throw createError.Unauthorized('Check your token scope.')
+  const principal = _.get(req, 'swagger.params.authUser')
+  if (!auth.hasScopes(principal, [scope])) {
+    throw createError.Forbidden('Insufficient token scope')
   }
 }
 

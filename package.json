@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "lint": "standard --fix"
+    "lint": "standard --fix",
+    "test": "node --test test/keycloak.test.cjs",
+    "build": "node scripts/build.cjs"
   },
   "keywords": [
     "swagger"
@@ -24,13 +26,15 @@
     "no-kafka": "^3.2.10",
     "superagent": "^3.8.3",
     "swagger-tools": "^0.10.4",
-    "tc-core-library-js": "topcoder-platform/tc-core-library-js.git#master",
-    "winston": "^3.0.0"
+    "tc-core-library-js": "https://codeload.github.com/topcoder-platform/tc-core-library-js/tar.gz/c262f4aca971904f308085bdeaaed35cdf3cfa7d",
+    "winston": "^3.0.0",
+    "body-parser": "^1.20.3"
   },
   "engines": {
-    "node": "~8"
+    "node": ">=22.23.2 <23"
   },
   "devDependencies": {
-    "standard": "^11.0.1"
+    "standard": "^11.0.1",
+    "nock": "^14.0.17"
   }
 }

@@ -80,9 +80,9 @@ The other configurations can be changed in `config/default.js` or by setting env
 - `LOG_LEVEL` the logging level. Default is `info`. Supported levels include `error`, `warn`, `info`, and `debug`.
 - `PORT` the port on that app listens
 - `API_VERSION` the api version
-- `JWT_TOKEN_SECRET` the secret to sign JWT tokens
+- `AUTH_SECRET` the member JWT secret (`JWT_TOKEN_SECRET` is retained as an explicit alias)
 - `TC_EMAIL_URL` the email service URL (http://localhost:4001, if deployed locally)
-- `TC_EMAIL_TOKEN` the email service authentication token (see tc-email README for details **link should be added later**)
+- `KEYCLOAK_CLIENT_ID` / `KEYCLOAK_CLIENT_SECRET` dedicated credentials for outbound placeholder lookup
 - `TC_EMAIL_CACHE_PERIOD` the period to cache template placeholders from email service (60 min default)
 
 ## Deploying the server
@@ -97,3 +97,31 @@ npm start
 To view the Swagger UI interface visit `http://localhost:3000/docs`
 
 This project leverages the mega-awesome [swagger-tools](https://github.com/apigee-127/swagger-tools) middleware which does most all the work.
+
+## Keycloak migration branch
+
+`keycloak_m2M` pins shared core 4.0.0-keycloak.0 at
+`c262f4aca971904f308085bdeaaed35cdf3cfa7d`. Run `nvm use` (Node 22.23.2).
+Configure `M2M_PROVIDER=keycloak`, `KEYCLOAK_ISSUER`, `KEYCLOAK_AUDIENCE`,
+`KEYCLOAK_TOKEN_URL`, and credentials when outbound template lookup is used.
+`KEYCLOAK_SCOPE` optionally requests grants. Issuance uses the managed HTTPS
+endpoint with no Auth0 fallback; all verification delegates to shared core.
+
+Bus events require service scope `write:bus_api`; GET/HEAD topics require
+`read:bus_topics`; placeholder-cache clearing requires `write:bus_api`.
+The Swagger `x-required-scope` metadata is enforced centrally, including HEAD.
+Members cannot substitute role/scope claims for machine grants. Legacy unscoped
+catalog/payload stub operations remain member-only. The normalized principal is
+stored in `req.swagger.params.authUser`; no namespace substring matching or
+synthetic member identity is used. Invalid JWTs return 401; missing grants 403.
+
+For legacy member sessions explicitly configure `AUTH_SECRET` (or its existing
+`JWT_TOKEN_SECRET` alias), `VALID_ISSUERS` as a JSON array, and
+`AUTH_USER_AUDIENCES` as a JSON array or `ALLOW_LEGACY_USER_AUDIENCE=true`.
+`verifyJwtToken` now returns a Promise for the same common validation contract;
+there are no runtime callers of that legacy helper in this repository.
+
+`npm run lint`, `npm run build` (runtime JavaScript syntax), and `npm test`
+validate this branch without Kafka publication or downstream writes. Configure
+dedicated Keycloak values before later rollout. CI excludes `keycloak_m2M`;
+existing DEV Bus services remain undeployed by this work.

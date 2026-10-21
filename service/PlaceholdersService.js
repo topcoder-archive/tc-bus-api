@@ -11,7 +11,9 @@ const logger = require('../common/logger')
 const m2m = tcCoreLibAuth.m2m(config)
 
 /**
- * Get all email template placeholders name.
+ * Get email template placeholders with a verified cached Keycloak credential.
+ * @param {String} name Email template name.
+ * Token failures are sanitized, logged, and preserve the existing empty-cache result.
  *
  * @returns {Array} list with email template placeholders name
  */
@@ -19,7 +21,7 @@ async function getAllPlaceholders (name) {
   const cachedData = cache.get(`placeholders-${name}`)
   if (cachedData == null) {
     try {
-      const token = await m2m.getMachineToken(config.AUTH0_CLIENT_ID, config.AUTH0_CLIENT_SECRET)
+      const token = await m2m.getMachineToken()
       const data = await request
         .get(`${config.TC_EMAIL_SERVICE_URL}/templates/${name}`)
         .set('accept', 'json')

@@ -13,7 +13,7 @@ module.exports.getTopics = function getTopics (req, res, next) {
     .getAllTopics()
     .then(topics => {
       const count = Array.isArray(topics) ? topics.length : 0
-      logger.info(`Fetched ${count} Kafka topic(s)`) 
+      logger.info(`Fetched ${count} Kafka topic(s)`)
       utils.writeJson(res, topics)
     })
 }

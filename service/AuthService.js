@@ -1,76 +1,37 @@
 const config = require('config')
-const { verifier } = require('tc-core-library-js').auth
-const _ = require('lodash')
+const { createValidator, hasScopes } = require('tc-core-library-js').auth
 
-const NOT_AUTHORIZED = 401
-
-/**
- * Function body is similar to tc-core-library-js
- * jwt auth middleware. That function is expressjs specific
- * and thus using the modified version here specific for
- * swagger code gen
+/** Create the Swagger security handler using shared-core JWT validation.
+ * Takes no arguments; reads explicit Keycloak/member trust from configuration.
+ * @returns {Function} Handler receiving request, security definition, bearer value and callback.
+ * @throws {TypeError} Invalid provider configuration at initialization.
+ * The handler reports sanitized 401 errors for invalid tokens and 403 for denied
+ * scopes. Scoped Bus operations are service-only; unscoped legacy catalog stubs
+ * remain member-only. No member ID/role/scope inference is performed here.
  */
 module.exports = function () {
-  let secret = config.get('AUTH_SECRET')
-  let validIssuers = JSON.parse(config.get('VALID_ISSUERS'))
-
-  if (!secret || secret.length === 0) {
-    throw new Error('Auth secret not provided')
-  }
-
-  if (!validIssuers || validIssuers.length === 0) {
-    throw new Error('JWT Issuers are not configured')
-  }
-
-  let authVerifier = verifier(validIssuers)
-
-  return function (req, authOrSecDef, scopesOrApiKey, callback) {
-    if (!!scopesOrApiKey && scopesOrApiKey.indexOf('Bearer') === 0) {
-      const token = scopesOrApiKey.split('Bearer ')[1]
-
-      authVerifier.validateToken(token, secret, (err, decoded) => {
-        let scopes
-
-        if (err) {
-          err.statusCode = NOT_AUTHORIZED
-          return callback(err)
-        }
-
-        decoded.userId = _.parseInt(_.find(decoded, (value, key) => {
-          return (key.indexOf('userId') !== -1)
-        }))
-        decoded.handle = _.find(decoded, (value, key) => {
-          return (key.indexOf('handle') !== -1)
-        })
-        decoded.roles = _.find(decoded, (value, key) => {
-          return (key.indexOf('roles') !== -1)
-        })
-
-        scopes = _.find(decoded, (value, key) => {
-          return (key.indexOf('scope') !== -1)
-        })
-
-        if (scopes) {
-          decoded.scopes = scopes.split(' ')
-
-          let grantType = _.find(decoded, (value, key) => {
-            return (key.indexOf('gty') !== -1)
-          })
-          if (grantType === 'client-credentials' &&
-              !decoded.userId &&
-              !decoded.roles) {
-            decoded.isMachine = true
-          }
-        }
-
-        req.swagger.params.authUser = decoded
-
-        callback()
-      })
-    } else {
-      const error = new Error('You are not authorized to access this resource')
-      error.statusCode = NOT_AUTHORIZED
-      callback(error)
+  const validator = createValidator(config)
+  return async function (req, authOrSecDef, scopesOrApiKey, callback) {
+    let principal
+    try {
+      const match = typeof scopesOrApiKey === 'string' ? /^Bearer ([^\s]+)$/i.exec(scopesOrApiKey) : null
+      if (!match) throw new Error('Missing bearer token')
+      principal = await validator.verify(match[1])
+    } catch (error) {
+      delete req.swagger.params.authUser
+      const failure = new Error('Invalid or expired token')
+      failure.statusCode = 401
+      callback(failure)
+      return
     }
+    const required = req.swagger.operation && req.swagger.operation['x-required-scope']
+    if ((required && !hasScopes(principal, [required])) || (!required && principal.kind === 'service')) {
+      const failure = new Error('Insufficient token scope')
+      failure.statusCode = 403
+      callback(failure)
+      return
+    }
+    req.swagger.params.authUser = principal
+    callback()
   }
 }

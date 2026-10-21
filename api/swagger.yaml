@@ -719,6 +719,7 @@ paths:
       summary: "Post event to the message bus."
       description: "Post an event to the message bus.\n"
       operationId: "postEvent"
+      x-required-scope: "write:bus_api"
       parameters:
       - in: "body"
         name: "body"
@@ -746,6 +747,7 @@ paths:
       summary: "Get topics."
       description: "Get all topic names.\n"
       operationId: "getTopics"
+      x-required-scope: "read:bus_topics"
       parameters: []
       responses:
         200:
@@ -774,6 +776,7 @@ paths:
       description: "Get response status and headers information for the endpoint.\
         \ It does not contain response body.\n"
       operationId: "headTopics"
+      x-required-scope: "read:bus_topics"
       parameters: []
       responses:
         200:
@@ -801,6 +804,7 @@ paths:
       summary: "Clear placeholders cache."
       description: "Clear the cache for placeholder validation of email topics.\n"
       operationId: "clearPlaceholdersCache"
+      x-required-scope: "write:bus_api"
       parameters: []
       responses:
         204:
