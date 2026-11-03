@@ -1,86 +1,14 @@
 version: 2.1
-defaults: &defaults
-  docker:
-    - image: docker:20.10.18-git
-install_dependency: &install_dependency
-  name: Installation of build and deployment dependencies.
-  command: |
-    apk update
-    apk add --no-cache bash curl
-    apk upgrade
-    apk add --no-cache jq py-pip sudo
-    sudo pip install awscli --upgrade
-install_deploysuite: &install_deploysuite
-  name: Installation of install_deploysuite.
-  command: |
-    git clone --branch v1.4.17 https://github.com/topcoder-platform/tc-deploy-scripts ../buildscript
-    cp ./../buildscript/master_deploy.sh .
-    cp ./../buildscript/buildenv.sh .
-    cp ./../buildscript/awsconfiguration.sh .
-    cp ./../buildscript/psvar-processor.sh .
-restore_cache_settings_for_build: &restore_cache_settings_for_build
-  key: docker-tc-bus-api-{{ checksum "package-lock.json" }}
-
-save_cache_settings: &save_cache_settings
-  key: docker-tc-bus-api-{{ checksum "package-lock.json" }}
-  paths:
-    - node_modules
-
-run_build: &run_build
-  name: Build of Docker image
-  command: ./build.sh
-
-builddeploy_steps: &builddeploy_steps
-  - checkout
-  - setup_remote_docker
-  - run: *install_dependency
-  - run: *install_deploysuite
-  - restore_cache: *restore_cache_settings_for_build
-  - run: *run_build
-  - save_cache: *save_cache_settings
-  - deploy:
-      name: Running deployment.
-      command: |
-        ./awsconfiguration.sh $DEPLOY_ENV
-        source awsenvconf
-        #./buildenv.sh -e DEV -b ${LOGICAL_ENV}-${APPNAME}-deployvar
-        #source buildenvvar
-        #./master_deploy.sh -d ECS -e DEV -t latest -s dev-global-appvar,${LOGICAL_ENV}-${APPNAME}-appvar -i ${APPNAME} -p FARGATE
-        #./deploy.sh DEV $CIRCLE_SHA1  
-        ./psvar-processor.sh -t appenv -p /config/${APPNAME}/deployvar
-        source deployvar_env
-        ./master_deploy.sh -d ECS -e $DEPLOY_ENV -t latest -j /config/${APPNAME}/appvar,/config/common/global-appvar -i ${APPNAME} -p FARGATE
-
 jobs:
-  # Build & Deploy against development backend rer
-  "build-dev":
-    <<: *defaults
-    environment:
-      DEPLOY_ENV: "DEV"
-      LOGICAL_ENV: "dev"
-      APPNAME: "tc-bus-api"
-    steps: *builddeploy_steps
-
-  "build-prod":
-    <<: *defaults
-    environment:
-      DEPLOY_ENV: "PROD"
-      LOGICAL_ENV: "prod"
-      APPNAME: "tc-bus-api"    
-    steps: *builddeploy_steps
-
+  deployment-disabled:
+    docker:
+    - image: cimg/aws@sha256:4cf3768db00ddf9bc439b8c84e8a60c11a14edf81c8baf76f74132144f8340d5
+    steps:
+    - run:
+        name: 'Inactive ECS service: automatic deployment disabled'
+        command: printf '%s\n' 'No image is published and no AWS session is requested. See deploy/MIGRATION.md before any
+          reactivation.'
 workflows:
-  version: 2
-  build:
+  inactive-service:
     jobs:
-      # Development builds are executed on "develop" branch only.
-      - "build-dev":
-          context: org-global
-          filters:
-            branches:
-              only: develop
-      - "build-prod":
-          context: org-global
-          filters:
-            branches:
-              only: master
+    - deployment-disabled
