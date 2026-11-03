@@ -1,1 +1,5 @@
 node_modules/
+
+# Infrastructure definitions and detailed AWS inventories are maintained privately.
+/deploy/iam/
+/deploy/*-baseline.json
